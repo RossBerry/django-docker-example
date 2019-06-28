@@ -1,0 +1,1 @@
+docker-compose run website python manage.py migrate
