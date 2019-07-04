@@ -2,9 +2,19 @@ version: '3'
 
 services:
   db:
-    image: postgres
+    restart: always
+    container_name: postgres
+    image: postgres:latest
+    ports:
+      - 5432:5432
+    volumes:
+      - ./db_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: docker
   website:
     build: ./website
+    container_name: website
     command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - ./website:/website
