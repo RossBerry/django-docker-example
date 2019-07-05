@@ -3,19 +3,19 @@ version: '3'
 services:
   db:
     restart: always
-    container_name: postgres
+    container_name: postgres_db
     image: postgres:latest
-    ports:
-      - 5432:5432
-    volumes:
-      - ./db_data:/var/lib/postgresql/data
     environment:
+      POSTGRES_DB: postgres
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: docker
+    ports:
+      - "5432:5432"
   website:
-    build: ./website
+    restart: always
     container_name: website
-    command: python manage.py runserver 0.0.0.0:8000
+    build: ./website
+    command: bash -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./website:/website
     ports:
