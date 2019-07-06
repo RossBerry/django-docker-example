@@ -13,24 +13,34 @@ import socket
 import sys
 import time
 
+def create_super_user():
+    """
+    Create super user account for django website.
+    """
+    create_super_user_cmd = "docker-compose run website python manage.py createsuperuser"
+    send_command(create_super_user_cmd)
+
 def get_latest_backup():
     """
     Retrieves the name of latest postgres db backup file.
     """
-    backups = [file for file in os.listdir(
-        "./postgres_data") if len(file) >= 4 and ".sql" in file]
-    if backups:
-        return backups[-1]
-
+    if "postgres_data" in os.listdir("./"):
+        backups = [file for file in os.listdir(
+            "./postgres_data") if len(file) >= 4 and ".sql" in file]
+        if backups:
+            return backups[-1]
 
 def backup_db():
     """
     Backs up the postgres database.
     """
     print("Backing up website!")
+    if "postgres_data" not in os.listdir("./"):
+        print("postgres_data directory does not already exist!")
+        print("creating postgres_data directory for db backup storage")
+        send_command("mkdir postgres_data")
     dt = datetime.datetime.now()
-    db_backup_file = f"dump_{dt.date().day}-{dt.date().month}-{dt.date().year}\
-             _{dt.time().hour}_{dt.time().minute}_{dt.time().second}.sql"
+    db_backup_file = f"dump_{dt.date().day}-{dt.date().month}-{dt.date().year}_{dt.time().hour}_{dt.time().minute}_{dt.time().second}.sql"
     db_backup_cmd = f"docker exec -t postgres_db pg_dumpall -c -U postgres > ./postgres_data/{db_backup_file}"
     send_command(db_backup_cmd)
     print(f"Database saved to {db_backup_file}")
@@ -42,7 +52,7 @@ def restore_db():
     """
     backup = get_latest_backup()
     if backup:
-        print(f"Restoring from ./postgres_data/{backup}")
+        print(f"Restoring from {backup}")
         db_restore_cmd = f"cat ./postgres_data/{backup} | docker exec -i postgres_db psql -U postgres"
         send_command(db_restore_cmd)
     else:
@@ -126,7 +136,8 @@ if __name__ == "__main__":
         "restore_db",
         "save_stop",
         "start",
-        "stop"
+        "stop",
+        "create_super_user"
     ]
 
     if sys.argv[1] in COMMANDS:
