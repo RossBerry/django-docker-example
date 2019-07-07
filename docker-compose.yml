@@ -2,7 +2,6 @@ version: '3'
 
 services:
   db:
-    restart: always
     container_name: postgres_db
     image: postgres:latest
     environment:
@@ -12,10 +11,9 @@ services:
     ports:
       - "5432:5432"
   website:
-    restart: always
     container_name: website
     build: ./website
-    command: bash -c "python manage.py migrate && python manage.py collectstatic --no-input && python manage.py runserver 0.0.0.0:80"
+    command: bash -c "python util.py wait 10 && python manage.py migrate && python manage.py collectstatic --no-input && python manage.py runserver 0.0.0.0:80"
     volumes:
       - ./website:/website
     ports:
