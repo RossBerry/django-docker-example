@@ -35,15 +35,15 @@ def build():
     build_cmd = "docker-compose up --build"
     send_command(build_cmd)
 
-    def build_d():
-        """
+def build_d():
+    """
     Starts the website with a new build - runs in the background.
     """
     build_cmd = "docker-compose up -d --build"
     send_command(build_cmd)
 
-    def build_restore():
-        """
+def build_restore():
+    """
     Starts the website with a new build and restores the latest db backup.
     """
     build_d()
@@ -80,6 +80,32 @@ def get_latest_backup():
         if backups:
             return backups[-1]
 
+def restart():
+    """
+    Restarts the website.
+    """
+    stop()
+    start()
+
+def restart_d():
+    """
+    Restarts the website - in the background.
+    """
+    stop()
+    start_d()
+
+def restart_restore():
+    """
+    Restart the website and restore the latest db backup.
+    """
+    stop()
+    start_d()
+    # wait until postgres database port is available
+    while not check_port(5432):
+        pass
+    time.sleep(10)  # wait for database to finish startup
+    restore_db()
+
 def restore_db():
     """
     Restores database from latest backup file, if available.
@@ -103,10 +129,13 @@ def send_command(command):
     """
     Sends a command to the command line.
     """
-    if PLATFORM == "win" or PLATFORM == "osx":
-        os.system(command)
-    elif PLATFORM == "lnx":
-        os.system(f"sudo {command}")
+    try:
+        if PLATFORM == "win" or PLATFORM == "osx":
+            os.system(command)
+        elif PLATFORM == "lnx":
+            os.system(f"sudo {command}")
+    except(KeyboardInterrupt):
+        print("Website stopped!")
 
 def start():
     """
@@ -143,6 +172,9 @@ def stop():
     stop_cmd = "docker-compose down"
     send_command(stop_cmd)
 
+def wait(seconds):
+    time.sleep(seconds)
+
 PLATFORM = sys.platform
 if PLATFORM == "linux" or PLATFORM == "linux2":
     PLATFORM = "lnx"
@@ -158,13 +190,20 @@ if __name__ == "__main__":
         "build_d",
         "build_restore",
         "create_super_user",
+        "restart",
+        "restart_d",
+        "restart_restore",
         "restore_db",
         "save_stop",
         "start",
         "start_d",
         "start_restore",
-        "stop"
+        "stop",
+        "wait"
     ]
 
     if sys.argv[1] in COMMANDS:
-        eval(f'{sys.argv[1]}()')
+        if sys.argv[1] != "wait":
+            eval(f'{sys.argv[1]}()')
+        elif len(sys.argv) == 3:
+            eval(f'{sys.argv[1]}({sys.argv[2]})')
