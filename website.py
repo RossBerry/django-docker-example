@@ -32,8 +32,21 @@ def build():
     """
     Starts the website with a new build.
     """
+    build_cmd = "docker-compose up --build"
+    send_command(build_cmd)
+
+    def build_d():
+        """
+    Starts the website with a new build - runs in the background.
+    """
     build_cmd = "docker-compose up -d --build"
     send_command(build_cmd)
+
+    def build_restore():
+        """
+    Starts the website with a new build and restores the latest db backup.
+    """
+    build_d()
     # wait until postgres database port is available
     while not check_port(5432):
         pass
@@ -99,8 +112,23 @@ def start():
     """
     Starts the website.
     """
+    print("Starting the website!")
+    start_cmd = "docker-compose up"
+    send_command(start_cmd)
+
+def start_d():
+    """
+    Starts the website as a daemon.
+    """
+    print("Starting the website!")
     start_cmd = "docker-compose up -d"
     send_command(start_cmd)
+
+def start_restore():
+    """
+    Starts the website and restore the latest db backup.
+    """
+    start_d()
     # wait until postgres database port is available
     while not check_port(5432):
         pass
@@ -127,10 +155,14 @@ if __name__ == "__main__":
     COMMANDS = [
         "backup_db",
         "build",
+        "build_d",
+        "build_restore",
         "create_super_user",
         "restore_db",
         "save_stop",
         "start",
+        "start_d",
+        "start_restore",
         "stop"
     ]
 
