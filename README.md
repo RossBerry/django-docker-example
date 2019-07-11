@@ -1,13 +1,13 @@
 # Django-Docker Blog Example
 
-A django blog website that runs in a docker container and uses a postgresql database that runs in a separate docker container.
+A django blog website that launches in a docker container and uses a postgres database running in a separate docker container.
 
 ## Requirements
  - python 3.6+
  - docker
  - docker-compose
 
-## Usage
+## Instructions:
 - Starting website:
     ```
     python website.py start
