@@ -13,55 +13,33 @@ import sys
 import time
 
 
-def backup_db():
-    """
-    Backs up the postgres database.
-    """
-    print("Backing up website!")
-    if "postgres_data" not in os.listdir("./"):
-        print("postgres_data directory does not already exist!")
-        print("creating postgres_data directory for db backup storage")
-        send_command("mkdir postgres_data")
-    dt = datetime.datetime.now()
-    db_backup_file = f"dump_{dt.date().day}-{dt.date().month}-{dt.date().year}_{dt.time().hour}_{dt.time().minute}_{dt.time().second}.sql"
-    db_backup_cmd = f"docker exec -t postgres_db pg_dumpall -c -U postgres > ./postgres_data/{db_backup_file}"
-    send_command(db_backup_cmd)
-    print(f"Database saved to {db_backup_file}")
-
-def build():
+def build(options):
     """
     Starts the website with a new build.
     """
-    build_cmd = "docker-compose up --build"
+    print("Building the website!")
+    options_str = " " + " ".join(options) if options else ""
+    build_cmd = f"docker-compose up{options_str} --build"
     send_command(build_cmd)
 
-def build_d():
-    """
-    Starts the website with a new build - runs in the background.
-    """
-    build_cmd = "docker-compose up -d --build"
-    send_command(build_cmd)
-
-def build_restore():
-    """
-    Starts the website with a new build and restores the latest db backup.
-    """
-    build_d()
-    # wait until postgres database port is available
-    while not check_port(5432):
-        pass
-    time.sleep(10)  # wait for database to finish startup
-    restore_db()
 
 def check_port(port):
     """
     Checks if a port is open.
     """
+    try_count = 0
+    port_open = False
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    result = sock.connect_ex(('127.0.0.1', port))
-    port_open = True if result == 0 else False
+    while try_count < 100:
+        result = sock.connect_ex(('127.0.0.1', port))
+        if result:
+            port_open = True
+            break
+        time.sleep(1)
+        try_count += 1
     sock.close()
     return port_open
+
 
 def create_super_user():
     """
@@ -69,6 +47,7 @@ def create_super_user():
     """
     create_super_user_cmd = "docker-compose run website python manage.py createsuperuser"
     send_command(create_super_user_cmd)
+
 
 def get_latest_backup():
     """
@@ -80,50 +59,67 @@ def get_latest_backup():
         if backups:
             return backups[-1]
 
-def restart():
+
+def handle_args(in_argv):
+    length = len(in_argv)
+    if length == 1:
+        print(MESSAGES["info"])
+    elif in_argv[1] in COMMANDS:
+        command = in_argv[1]
+        options = in_argv[2:] if length > 2 else []
+        COMMANDS[command](options)
+    else:
+        print(MESSAGES["invalid"])
+
+
+def restart(options):
     """
     Restarts the website.
     """
-    stop()
-    start()
+    stop([option for option in options if option != "-r"])
+    start([option for option in options if option != "-s"])
 
-def restart_d():
-    """
-    Restarts the website - in the background.
-    """
-    stop()
-    start_d()
 
-def restart_restore():
+def restore():
     """
-    Restart the website and restore the latest db backup.
+    Restore the website.
     """
-    stop()
-    start_d()
-    # wait until postgres database port is available
-    while not check_port(5432):
-        pass
-    time.sleep(10)  # wait for database to finish startup
     restore_db()
+
 
 def restore_db():
     """
     Restores database from latest backup file, if available.
     """
-    backup = get_latest_backup()
-    if backup:
-        print(f"Restoring from {backup}")
-        db_restore_cmd = f"cat ./postgres_data/{backup} | docker exec -i postgres_db psql -U postgres"
+    latest_backup = get_latest_backup()
+    if latest_backup:
+        print(f"Restoring from {latest_backup}")
+        db_restore_cmd = f"cat ./postgres_data/{latest_backup} | docker exec -i postgres_db psql -U postgres"
         send_command(db_restore_cmd)
     else:
-        print("Cannot find a backup file to restore from")
+        print("No backup file to restore from!")
 
-def save_stop():
+def save():
     """
-    Backs up the website, then shuts down the database and webserver.
+    Saves the website.
     """
-    backup_db()
-    stop()
+    save_db()
+
+
+def save_db():
+    """
+    Saves the postgres database.
+    """
+    print("Saving the database!")
+    if "postgres_data" not in os.listdir("./"):
+        print("postgres_data directory does not already exist!")
+        print("creating postgres_data directory for db backup storage")
+        send_command("mkdir postgres_data")
+    dt = datetime.datetime.now()
+    db_backup_file = f"dump_{dt.date().day}-{dt.date().month}-{dt.date().year}_{dt.time().hour}_{dt.time().minute}_{dt.time().second}.sql"
+    db_backup_cmd = f"docker exec -t postgres_db pg_dumpall -c -U postgres > ./postgres_data/{db_backup_file}"
+    send_command(db_backup_cmd)
+    print(f"Database saved to {db_backup_file}")
 
 def send_command(command):
     """
@@ -137,43 +133,44 @@ def send_command(command):
     except(KeyboardInterrupt):
         print("Website stopped!")
 
-def start():
+
+def start(options):
     """
     Starts the website.
     """
-    print("Starting the website!")
-    start_cmd = "docker-compose up"
+    msg = MESSAGES["start"]
+    msg = msg.format(" in detached mode") if "-d" in options else msg.format("")
+    print(msg)
+    restore_option = "-r" in options
+    if restore_option:
+        options.remove("-r")
+    options_str = " " + " ".join(options) if options else ""
+    start_cmd = f"docker-compose up{options_str}"
     send_command(start_cmd)
+    if restore_option:
+        restore()
 
-def start_d():
-    """
-    Starts the website as a daemon.
-    """
-    print("Starting the website!")
-    start_cmd = "docker-compose up -d"
-    send_command(start_cmd)
 
-def start_restore():
-    """
-    Starts the website and restore the latest db backup.
-    """
-    start_d()
-    # wait until postgres database port is available
-    while not check_port(5432):
-        pass
-    time.sleep(10)  # wait for database to finish startup
-    restore_db()
-
-def stop():
+def stop(options):
     """
     Shuts down the postgres database and webserver.
     """
-    print("Shutting down website!")
-    stop_cmd = "docker-compose down"
+    print("Stopping website and database!")
+    save_option = "-s" in options
+    if save_option:
+        options.remove("-s")
+        save()
+    options_str = " " + " ".join(options) if options else ""
+    stop_cmd = f"docker-compose down{options_str}"
     send_command(stop_cmd)
 
+
 def wait(seconds):
+    """
+    Wait for a specified number of seconds.
+    """
     time.sleep(seconds)
+
 
 PLATFORM = sys.platform
 if PLATFORM == "linux" or PLATFORM == "linux2":
@@ -184,26 +181,19 @@ elif PLATFORM == "win32":
     PLATFORM = "win"
 
 if __name__ == "__main__":
-    COMMANDS = [
-        "backup_db",
-        "build",
-        "build_d",
-        "build_restore",
-        "create_super_user",
-        "restart",
-        "restart_d",
-        "restart_restore",
-        "restore_db",
-        "save_stop",
-        "start",
-        "start_d",
-        "start_restore",
-        "stop",
-        "wait"
-    ]
-
-    if sys.argv[1] in COMMANDS:
-        if sys.argv[1] != "wait":
-            eval(f'{sys.argv[1]}()')
-        elif len(sys.argv) == 3:
-            eval(f'{sys.argv[1]}({sys.argv[2]})')
+    MESSAGES = {
+        "info": "list commands",
+        "invalid": "not a valid command",
+        "start": "Starting the website{}!"
+    }
+    COMMANDS = {
+        "build": build,
+        "create_super_user": create_super_user,
+        "restart": restart,
+        "restore": restore,
+        "save": save,
+        "start": start,
+        "stop": stop,
+        "wait": wait
+    }
+    handle_args(sys.argv)
